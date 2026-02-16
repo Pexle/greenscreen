@@ -5,8 +5,8 @@ import mediapipe as mp
 import tempfile
 import os
 
-# Explicitly import the solution to avoid AttributeError on Streamlit Cloud
-from mediapipe.python.solutions import selfie_segmentation as mp_selfie_segmentation
+# Standard stable import for Cloud
+from mediapipe.tasks import python as mp_python
 
 # --- UI SETUP ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
@@ -73,3 +73,4 @@ if uploaded_file is not None:
         st.success("Video processed successfully!")
     
     os.remove(tfile_path)
+
