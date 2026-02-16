@@ -21,12 +21,17 @@ if uploaded_file is not None:
     
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
-    # 2. Modern Tasks Engine Setup
-    # This downloads the small model file into the server memory
-    base_options = mp_python.BaseOptions(model_asset_buffer=None) # Uses default
-    options = vision.ImageSegmenterOptions(base_options=base_options,
-                                           output_category_mask=True)
+    # --- MODEL SETUP ---
+    # Using the official URL for the Selfie Segmenter model
+    model_url = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+    base_options = mp_python.BaseOptions(model_asset_path=model_url)
+    
+    options = vision.ImageSegmenterOptions(
+        base_options=base_options,
+        output_category_mask=True
+    )
 
+    # --- PROCESSING ---
     with vision.ImageSegmenter.create_from_options(options) as segmentor:
         cap = cv2.VideoCapture(tfile_path)
         width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -45,14 +50,14 @@ if uploaded_file is not None:
             success, frame = cap.read()
             if not success: break
 
-            # Convert to MediaPipe Image
+            # Convert to MediaPipe format
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             
-            # Segment the frame
+            # Segment
             segmentation_result = segmentor.segment(mp_image)
             category_mask = segmentation_result.category_mask.numpy_view()
             
-            # Mask logic (category 0 is usually background in this model)
+            # In this model, values > 0.1 represent the person
             mask = category_mask > 0.1 
             
             green_bg = np.zeros(frame.shape, dtype=np.uint8)
@@ -72,5 +77,10 @@ if uploaded_file is not None:
     if os.path.exists(output_path):
         st.divider()
         with open(output_path, "rb") as file:
-            st.download_button(label="⬇️ Download Result", data=file, file_name="output.mp4", mime="video/mp4")
-        st.success("✅ Success!")
+            st.download_button(label="⬇️ Download VantageBG Result", data=file, file_name="output.mp4", mime="video/mp4")
+        st.success("✅ Success! Your video is ready.")
+    
+    try:
+        os.remove(tfile_path)
+    except:
+        pass
