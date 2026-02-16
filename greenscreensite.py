@@ -15,7 +15,6 @@ st.title("🎬 VantageBG: AI Background Remover")
 uploaded_file = st.file_uploader("Upload a video (MP4/MOV)", type=["mp4", "mov"])
 
 if uploaded_file is not None:
-    # 1. Save uploaded video
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") 
     tfile.write(uploaded_file.read())
     tfile_path = tfile.name
@@ -62,14 +61,16 @@ if uploaded_file is not None:
             segmentation_result = segmentor.segment(mp_image)
             category_mask = segmentation_result.category_mask.numpy_view()
             
-            # --- FIX: Squeeze the mask to remove extra dimensions ---
+            # --- LOGIC FLIP FIX ---
+            # We want 'mask' to be True for the person (so they are NOT green)
+            # In this model, high values = person, low values = background
             mask = category_mask.squeeze() > 0.1 
             
-            # Prepare green background
             green_bg = np.zeros(frame.shape, dtype=np.uint8)
-            green_bg[:] = (0, 255, 0) # BGR Neon Green
+            green_bg[:] = (0, 255, 0)
             
-            # Match shapes for the 'where' operation
+            # np.where(condition, if_true, if_false)
+            # If mask is True (Person), keep original frame. Else (Background), use green_bg.
             condition = np.stack((mask,) * 3, axis=-1)
             output_frame = np.where(condition, frame, green_bg)
             
@@ -87,7 +88,7 @@ if uploaded_file is not None:
         st.divider()
         with open(output_path, "rb") as file:
             st.download_button(label="⬇️ Download VantageBG Result", data=file, file_name="vantage_output.mp4", mime="video/mp4")
-        st.success("✅ Success! Your video is ready.")
+        st.success("✅ Success! The background has been removed.")
     
     try:
         os.remove(tfile_path)
