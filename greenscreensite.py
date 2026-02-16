@@ -62,13 +62,18 @@ if uploaded_file is not None:
             segmentation_result = segmentor.segment(mp_image)
             category_mask = segmentation_result.category_mask.numpy_view()
             
-            # Mask logic
-            mask = category_mask > 0.1 
+            # --- FIX: Squeeze the mask to remove extra dimensions ---
+            mask = category_mask.squeeze() > 0.1 
+            
+            # Prepare green background
             green_bg = np.zeros(frame.shape, dtype=np.uint8)
-            green_bg[:] = (0, 255, 0)
+            green_bg[:] = (0, 255, 0) # BGR Neon Green
+            
+            # Match shapes for the 'where' operation
             condition = np.stack((mask,) * 3, axis=-1)
             output_frame = np.where(condition, frame, green_bg)
-            out.write(output_frame)
+            
+            out.write(output_frame.astype(np.uint8))
             
             frame_count += 1
             if total_frames > 0:
@@ -81,5 +86,10 @@ if uploaded_file is not None:
     if os.path.exists(output_path):
         st.divider()
         with open(output_path, "rb") as file:
-            st.download_button(label="⬇️ Download Result", data=file, file_name="vantage_output.mp4", mime="video/mp4")
-        st.success("✅ Success!")
+            st.download_button(label="⬇️ Download VantageBG Result", data=file, file_name="vantage_output.mp4", mime="video/mp4")
+        st.success("✅ Success! Your video is ready.")
+    
+    try:
+        os.remove(tfile_path)
+    except:
+        pass
