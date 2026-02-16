@@ -5,12 +5,18 @@ import mediapipe as mp
 import tempfile
 import os
 
-# --- RESILIENT IMPORT LOGIC ---
-# This tries both common ways MediaPipe stores this module to break the error loop
+# --- UNIVERSAL IMPORT FAIL-SAFE ---
 try:
+    # Try the most common modern path
     from mediapipe.python.solutions import selfie_segmentation
 except ImportError:
-    import mediapipe.solutions.selfie_segmentation as selfie_segmentation
+    try:
+        # Try the legacy path
+        import mediapipe.solutions.selfie_segmentation as selfie_segmentation
+    except ImportError:
+        # If all else fails, provide a clear error message in the UI
+        st.error("AI Engine (MediaPipe) failed to load. Please check requirements.txt")
+        st.stop()
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
@@ -19,6 +25,7 @@ st.title("🎬 VantageBG: AI Background Remover")
 uploaded_file = st.file_uploader("Upload a video (MP4/MOV)", type=["mp4", "mov"])
 
 if uploaded_file is not None:
+    # Create temp file
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") 
     tfile.write(uploaded_file.read())
     tfile_path = tfile.name
@@ -26,7 +33,7 @@ if uploaded_file is not None:
     
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
-    # 2. Run AI Segmentation
+    # Run Segmentation
     with selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentor:
         cap = cv2.VideoCapture(tfile_path)
         
@@ -38,7 +45,6 @@ if uploaded_file is not None:
             fps    = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
-            # Use 'mp4v' for maximum compatibility
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
             
@@ -69,12 +75,11 @@ if uploaded_file is not None:
             cap.release()
             out.release()
 
-    # 3. Final Download Link
     if os.path.exists(output_path):
         st.divider()
         with open(output_path, "rb") as file:
             st.download_button(
-                label="⬇️ Download Processed Video",
+                label="⬇️ Download VantageBG Result",
                 data=file,
                 file_name="background_removed.mp4",
                 mime="video/mp4"
