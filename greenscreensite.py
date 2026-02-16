@@ -6,6 +6,7 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 import tempfile
 import os
+import requests
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
@@ -14,6 +15,7 @@ st.title("🎬 VantageBG: AI Background Remover")
 uploaded_file = st.file_uploader("Upload a video (MP4/MOV)", type=["mp4", "mov"])
 
 if uploaded_file is not None:
+    # 1. Save uploaded video
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") 
     tfile.write(uploaded_file.read())
     tfile_path = tfile.name
@@ -21,11 +23,17 @@ if uploaded_file is not None:
     
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
-    # --- MODEL SETUP ---
-    # Using the official URL for the Selfie Segmenter model
+    # --- MODEL DOWNLOAD & SETUP ---
     model_url = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
-    base_options = mp_python.BaseOptions(model_asset_path=model_url)
-    
+    model_local_path = os.path.join(tempfile.gettempdir(), "selfie_segmenter.tflite")
+
+    if not os.path.exists(model_local_path):
+        with st.spinner("Initializing AI Engine..."):
+            r = requests.get(model_url)
+            with open(model_local_path, "wb") as f:
+                f.write(r.content)
+
+    base_options = mp_python.BaseOptions(model_asset_path=model_local_path)
     options = vision.ImageSegmenterOptions(
         base_options=base_options,
         output_category_mask=True
@@ -50,16 +58,12 @@ if uploaded_file is not None:
             success, frame = cap.read()
             if not success: break
 
-            # Convert to MediaPipe format
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            
-            # Segment
             segmentation_result = segmentor.segment(mp_image)
             category_mask = segmentation_result.category_mask.numpy_view()
             
-            # In this model, values > 0.1 represent the person
+            # Mask logic
             mask = category_mask > 0.1 
-            
             green_bg = np.zeros(frame.shape, dtype=np.uint8)
             green_bg[:] = (0, 255, 0)
             condition = np.stack((mask,) * 3, axis=-1)
@@ -77,10 +81,5 @@ if uploaded_file is not None:
     if os.path.exists(output_path):
         st.divider()
         with open(output_path, "rb") as file:
-            st.download_button(label="⬇️ Download VantageBG Result", data=file, file_name="output.mp4", mime="video/mp4")
-        st.success("✅ Success! Your video is ready.")
-    
-    try:
-        os.remove(tfile_path)
-    except:
-        pass
+            st.download_button(label="⬇️ Download Result", data=file, file_name="vantage_output.mp4", mime="video/mp4")
+        st.success("✅ Success!")
