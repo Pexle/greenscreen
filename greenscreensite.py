@@ -5,17 +5,17 @@ import mediapipe as mp
 import tempfile
 import os
 
-# Standard stable import for Cloud
-from mediapipe.tasks import python as mp_python
+# Correct explicit import to prevent NameError and AttributeError
+from mediapipe.python.solutions import selfie_segmentation as mp_selfie_segmentation
 
-# --- UI SETUP ---
+# --- PAGE CONFIG ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
 st.title("🎬 VantageBG: AI Background Remover")
-st.write("Professional-grade green screen generation.")
 
 uploaded_file = st.file_uploader("Upload a video (MP4/MOV)", type=["mp4", "mov"])
 
 if uploaded_file is not None:
+    # 1. Handle Temporary Files
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") 
     tfile.write(uploaded_file.read())
     tfile_path = tfile.name
@@ -23,7 +23,8 @@ if uploaded_file is not None:
     
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
-    # Use the explicitly imported module
+    # 2. Run AI Segmentation
+    # The name here MUST match the import name 'mp_selfie_segmentation'
     with mp_selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentor:
         cap = cv2.VideoCapture(tfile_path)
         width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -45,7 +46,6 @@ if uploaded_file is not None:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = segmentor.process(frame_rgb)
             
-            # Ensure we have a valid segmentation mask
             if results.segmentation_mask is not None:
                 mask = results.segmentation_mask > 0.5
                 green_bg = np.zeros(frame.shape, dtype=np.uint8)
@@ -62,6 +62,7 @@ if uploaded_file is not None:
         cap.release()
         out.release()
 
+    # 3. Final Download Link
     if os.path.exists(output_path):
         with open(output_path, "rb") as file:
             st.download_button(
@@ -70,7 +71,9 @@ if uploaded_file is not None:
                 file_name="vantage_greenscreen.mp4",
                 mime="video/mp4"
             )
-        st.success("Video processed successfully!")
+        st.success("Processing Complete!")
     
-    os.remove(tfile_path)
-
+    try:
+        os.remove(tfile_path)
+    except:
+        pass
