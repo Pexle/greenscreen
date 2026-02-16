@@ -5,9 +5,12 @@ import mediapipe as mp
 import tempfile
 import os
 
-# --- HARDENED IMPORT ---
-# This avoids the AttributeError on Linux servers
-from mediapipe.python.solutions import selfie_segmentation
+# --- RESILIENT IMPORT LOGIC ---
+# This tries both common ways MediaPipe stores this module to break the error loop
+try:
+    from mediapipe.python.solutions import selfie_segmentation
+except ImportError:
+    import mediapipe.solutions.selfie_segmentation as selfie_segmentation
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
@@ -23,7 +26,7 @@ if uploaded_file is not None:
     
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
-    # 2. Run AI Segmentation using the manual import
+    # 2. Run AI Segmentation
     with selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentor:
         cap = cv2.VideoCapture(tfile_path)
         
