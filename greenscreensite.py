@@ -5,6 +5,9 @@ import mediapipe as mp
 import tempfile
 import os
 
+# Directly import the specific class to avoid the AttributeError
+from mediapipe.python.solutions.selfie_segmentation import SelfieSegmentation
+
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
 st.title("🎬 VantageBG: AI Background Remover")
@@ -21,15 +24,14 @@ if uploaded_file is not None:
     output_path = os.path.join(tempfile.gettempdir(), "vantage_output.mp4")
     
     # 2. Run AI Segmentation
-    # Using the standard solutions path for cloud stability
-    with mp.solutions.selfie_segmentation.SelfieSegmentation(model_selection=1) as segmentor:
+    # We use the direct SelfieSegmentation class imported above
+    with SelfieSegmentation(model_selection=1) as segmentor:
         cap = cv2.VideoCapture(tfile_path)
         width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps    = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        # 'mp4v' is the safest codec for Streamlit Cloud to Windows downloads
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
@@ -47,7 +49,7 @@ if uploaded_file is not None:
             if results.segmentation_mask is not None:
                 mask = results.segmentation_mask > 0.5
                 green_bg = np.zeros(frame.shape, dtype=np.uint8)
-                green_bg[:] = (0, 255, 0) # Neon Green (BGR)
+                green_bg[:] = (0, 255, 0)
                 
                 condition = np.stack((mask,) * 3, axis=-1)
                 output_frame = np.where(condition, frame, green_bg)
@@ -73,7 +75,6 @@ if uploaded_file is not None:
             )
         st.success("Processing Complete!")
     
-    # Cleanup temp file
     try:
         os.remove(tfile_path)
     except:
