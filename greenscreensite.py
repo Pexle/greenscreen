@@ -11,7 +11,6 @@ import requests
 st.set_page_config(page_title="VantageBG", page_icon="🎬")
 st.title("🎬 VantageBG: AI Background Remover")
 
-# Use session state to prevent re-processing on download
 if 'processed' not in st.session_state:
     st.session_state.processed = False
 
@@ -29,7 +28,7 @@ if uploaded_file is not None and not st.session_state.processed:
     model_local_path = os.path.join(tempfile.gettempdir(), "selfie_segmenter.tflite")
 
     if not os.path.exists(model_local_path):
-        with st.spinner("Initializing AI..."):
+        with st.spinner("Initializing AI Engine..."):
             r = requests.get(model_url)
             with open(model_local_path, "wb") as f:
                 f.write(r.content)
@@ -42,13 +41,14 @@ if uploaded_file is not None and not st.session_state.processed:
         width, height = int(cap.get(3)), int(cap.get(4))
         fps = cap.get(cv2.CAP_PROP_FPS)
         
+        # Using H.264 compatible codec
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
         bar = st.progress(0)
         status = st.empty()
-        frame_count = 0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        frame_count = 0
 
         while cap.isOpened():
             success, frame = cap.read()
@@ -58,9 +58,9 @@ if uploaded_file is not None and not st.session_state.processed:
             segmentation_result = segmentor.segment(mp_image)
             category_mask = segmentation_result.category_mask.numpy_view()
             
-            # --- LOGIC SELECTION ---
-            # Try > 0.2 first. If it's still inverted, change to < 0.2
-            mask = category_mask.squeeze() > 0.2 
+            # --- THE INVERSION FIX ---
+            # We use ~ to invert the selection
+            mask = ~(category_mask.squeeze() > 0.2) 
             
             green_bg = np.zeros(frame.shape, dtype=np.uint8)
             green_bg[:] = (0, 255, 0)
@@ -77,7 +77,6 @@ if uploaded_file is not None and not st.session_state.processed:
         out.release()
         st.session_state.processed = output_path
 
-# Display results if they exist in session state
 if st.session_state.processed:
     st.success("✅ Video Ready!")
     with open(st.session_state.processed, "rb") as file:
@@ -86,7 +85,7 @@ if st.session_state.processed:
             data=file, 
             file_name="vantage_output.mp4", 
             mime="video/mp4",
-            on_click=lambda: st.session_state.update(processed=False) # Reset for next upload
+            on_click=lambda: st.session_state.update(processed=False)
         )
     if st.button("Start New Video"):
         st.session_state.processed = False
